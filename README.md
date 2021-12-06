@@ -65,6 +65,38 @@ This is the functions that sit in the top of the hierarchy. The role of this is 
 Here I check if any function with the same ```FunctionId``` is registered or running. And if yes, do not start another one, or if not, start a new orchestrator.
 
 This guarantees that only one function of the same id is running at any given time.
+```cs
+ public static async Task<HttpResponseMessage> HttpStart([HttpTrigger(AuthorizationLevel.Anonymous, "get", "post")] HttpRequestMessage req, [DurableClient] IDurableOrchestrationClient starter, ILogger log)
+{
+    var existingInstance = await starter.GetStatusAsync(FunctionId);
+    if (
+        existingInstance == null
+     || existingInstance.RuntimeStatus == OrchestrationRuntimeStatus.Completed
+     || existingInstance.RuntimeStatus == OrchestrationRuntimeStatus.Failed
+     || existingInstance.RuntimeStatus == OrchestrationRuntimeStatus.Terminated)
+        {
+            string instanceId = await starter.StartNewAsync(FunctionOrchestratorName, FunctionId);
+
+            log.LogInformation($"Started orchestration with ID = '{instanceId}'.");
+
+            return starter.CreateCheckStatusResponse(req, FunctionId);
+        }
+        else
+        {
+            // An instance with the specified ID exists or an existing one still running, don't create one.
+            return new HttpResponseMessage(HttpStatusCode.Conflict)
+            {
+                Content = new StringContent($"An instance with ID '{FunctionId}' already exists."),
+            };
+        }
+}
+
+```
+
+
+
+
+
 
 #### Orchestrator Function
 This is a function that is started by the HttpStart, and as the name implies, orchestrates all the other functions. For simplicity, I am choosing for the orchestrator to only run one activity functions, that maybe does a few things. 
@@ -78,12 +110,64 @@ Now, at this point the orchestrator, in conjunction with the activity function h
 - Decision 2. What to do when activity function returns 0, meaning that it ran and found no records to process. At this time, if you start the activity functions again, you will get the same result, and will create a fast-running loop that does nothing. So, it is wise to snooze the functions for a short period of time. I have created a ```const```, named ```MinutesToWaitAfterNoRecordsProcessed``` to hold the number of minutes we want to postpone the next execution.
 - Decision 3: What to do when activity function runs, and for whatever reason it throws a non-transient error, meaning that something is irrecoverably wrong with the processor. In that case, we don't want to start the processor again, but rather log the error, notify someone (if necessary) and postpone the next execution by a certain number of minutes. I have created a ```const```, named ```MinutesToWaitAfterErrorInRecordsProcessing``` that holds the number of minutes that we will postpone the function due to the exception.
 
+```cs
+
+public static async Task RunOrchestrator([OrchestrationTrigger] IDurableOrchestrationContext context, ILogger logger)
+{
+    logger = context.CreateReplaySafeLogger(logger);
+    int postpone_in_minutes = 0;
+    try
+    {
+        var results = await context.CallActivityAsync<int>(FunctionExecutorName, null);
+        if (results > 0)
+        {
+            logger.LogWarning($"{results} records were succesfuly processed.");
+        }
+        else
+        {
+            logger.LogWarning($"No records were processed. Pausing for {MinutesToWaitAfterNoRecordsProcessed} min(s).");
+            postpone_in_minutes = MinutesToWaitAfterNoRecordsProcessed;
+        }
+    }
+    catch (Exception ex)
+    {
+        logger.LogError($"{ex.Message} [{ex.InnerException?.Message}]");
+        logger.LogWarning($"An error ocurred. Pausing for {MinutesToWaitAfterErrorInRecordsProcessing} min(s).");
+        postpone_in_minutes = MinutesToWaitAfterErrorInRecordsProcessing;
+    }
+    if (postpone_in_minutes > 0)
+        await context.CreateTimer(context.CurrentUtcDateTime.Add(TimeSpan.FromMinutes(postpone_in_minutes)), CancellationToken.None);
+    context.ContinueAsNew(null);
+}
+```
+
+
+
 #### Activity Function
 Next in the call chain is the Activity Function. Right now, because of simplicity, this function calls a method that simulates a call to a processor that does some work and return the number of records processed.
+
+```cs
+public static async Task<int> ActivityFunction([ActivityTrigger] object input, ILogger logger)
+{
+    return await ProcessRecordsSimulation(logger);
+}
+```
 
 #### Processor 
 
 A method ```ProcessRecordsSimulation``` that simulates a processing or batch unit that is called by the activity function.
+```cs
+public static async Task<int> ProcessRecordsSimulation(ILogger logger)
+{
+    var results = new Random().Next(0, 5);
+    logger.LogInformation(results > 0 
+        ? "It simulates that 1 or more records were processed." 
+        : "It sumlates that 0 records were processed.");
+    return results;
+}
+```
+
+
 
 As you will see in the code of the solution, with a few minor tweaks, you can abstract this solution enough to use it generically in any situation when you need some processing to happen in a continuous fashion.
 
