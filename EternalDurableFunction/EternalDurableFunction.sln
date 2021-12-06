@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.0.31903.59
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "EternalDurableFunction", "EternalDurableFunction\EternalDurableFunction.csproj", "{938E54E0-2677-45E5-A402-1FD139EFBBCE}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{938E54E0-2677-45E5-A402-1FD139EFBBCE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{938E54E0-2677-45E5-A402-1FD139EFBBCE}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{938E54E0-2677-45E5-A402-1FD139EFBBCE}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{938E54E0-2677-45E5-A402-1FD139EFBBCE}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {428F2460-6027-4FFD-B350-726AF5684D8F}
+	EndGlobalSection
+EndGlobal
